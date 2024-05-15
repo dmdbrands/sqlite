@@ -49,12 +49,14 @@ class UtilsFile {
                 // exclude the directory from iCloud Backup
                 try UtilsFile.setExcludeFromiCloudBackup(&dirUrl,
                                                          isExcluded: true)
-                // move all existing dbs from "Documents" to location folder
-                if location.prefix(9) != "Documents" &&
+                // move all existing dbs from "Library" to location folder
+                if location.prefix(9) != "Library" &&
                     location.prefix(7) != "default" {
-                    let databaseURL: URL = try UtilsFile
-                        .getDatabasesUrl().absoluteURL
-
+                    var databaseURL: URL = try UtilsFile
+                        .getLibraryURL().absoluteURL
+                    let folderName = location.split(separator: "/").last ?? ""
+                    databaseURL = databaseURL
+                        .appendingPathComponent(String(folderName)).absoluteURL
                     try UtilsFile.moveAllDBSQLite(fromURL: databaseURL,
                                                   dirUrl: dirUrl)
                 }
@@ -149,7 +151,11 @@ class UtilsFile {
         do {
             let databaseURL = try UtilsFile.getDatabasesUrl().absoluteURL
             var dbPathURL: URL
-            let first = folderPath.split(separator: "/", maxSplits: 1)
+            let first = folderPath.split(separator: "/", maxSplits: 2)
+            var folderName = ""
+            if first.count > 1 {
+                folderName = String(first[1])
+            }
             if first[0] == "Applications" {
                 dbPathURL = try UtilsFile.getApplicationURL().absoluteURL
             } else if first[0] == "Library" {
@@ -160,6 +166,13 @@ class UtilsFile {
                 dbPathURL = try UtilsFile.getCacheURL().absoluteURL
             } else if first[0] == "Documents" || first[0] == "default" {
                 dbPathURL = databaseURL
+            } else if first[0] == "AppGroup" {
+                if let appGroupDirectoryPath = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: folderName) {
+                    dbPathURL = appGroupDirectoryPath.absoluteURL
+                } else {
+                    dbPathURL = databaseURL
+                }
+                folderName = String(first[2])
             } else {
                 var msg: String = "getFolderURL command failed :"
                 msg.append(" Folder '\(first[0])' not allowed")
@@ -167,7 +180,7 @@ class UtilsFile {
             }
             if first.count > 1 {
                 dbPathURL = dbPathURL
-                    .appendingPathComponent(String(first[1])).absoluteURL
+                    .appendingPathComponent(folderName).absoluteURL
             }
             return dbPathURL
         } catch UtilsFileError.getDatabasesURLFailed {
